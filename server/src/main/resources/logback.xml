@@ -1,0 +1,10 @@
+<configuration>
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <layout>
+            <Pattern>[connID:%X{connID:-none}][reqID:%X{reqID:-none}] - %m%n</Pattern>
+        </layout>
+    </appender>
+    <root level="info">
+        <appender-ref ref="CONSOLE" />
+    </root>
+</configuration>
