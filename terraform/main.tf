@@ -18,6 +18,7 @@ provider "aws" {
   }
 }
 
+data "aws_region" "current" {}
 data "aws_caller_identity" "current" {}
 
 locals {
@@ -26,6 +27,7 @@ locals {
   elb_aws_account_id = "582318560864"
 
   project_name   = "elb-timeouts"
+  aws_region     = data.aws_region.current.name
   aws_account_id = data.aws_caller_identity.current.account_id
 }
 
@@ -263,5 +265,355 @@ resource "aws_route53_record" "app" {
     name                   = aws_lb.this.dns_name
     zone_id                = aws_lb.this.zone_id
     evaluate_target_health = false
+  }
+}
+
+resource "aws_s3_bucket" "athena_result" {
+  bucket        = "${local.project_name}-athena-results-${local.aws_account_id}"
+  force_destroy = true
+}
+resource "aws_s3_bucket_public_access_block" "athena_result" {
+  bucket = aws_s3_bucket.athena_result.bucket
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_athena_database" "log_search" {
+  name   = "${replace(local.project_name, "-", "_")}_log_search"
+  bucket = aws_s3_bucket.athena_result.bucket
+}
+
+resource "aws_glue_catalog_table" "access_log" {
+  name          = "alb_access_logs"
+  database_name = aws_athena_database.log_search.name
+  owner         = "hadoop"
+  parameters = {
+    EXTERNAL                       = "TRUE"
+    "projection.day.format"        = "yyyy/MM/dd"
+    "projection.day.interval"      = "1"
+    "projection.day.interval.unit" = "DAYS"
+    "projection.day.range"         = "2022/01/01,NOW"
+    "projection.day.type"          = "date"
+    "projection.enabled"           = "true"
+    "storage.location.template"    = "s3://${aws_s3_bucket.alb_logs.bucket}/${local.access_log_prefix}/AWSLogs/${local.aws_account_id}/elasticloadbalancing/${local.aws_region}/$${day}"
+  }
+  retention  = 0
+  table_type = "EXTERNAL_TABLE"
+  partition_keys {
+    name = "day"
+    type = "string"
+  }
+  storage_descriptor {
+    additional_locations      = []
+    bucket_columns            = []
+    compressed                = false
+    input_format              = "org.apache.hadoop.mapred.TextInputFormat"
+    location                  = "s3://${aws_s3_bucket.alb_logs.bucket}/${local.access_log_prefix}/AWSLogs/${local.aws_account_id}/elasticloadbalancing/${local.aws_region}"
+    number_of_buckets         = -1
+    output_format             = "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat"
+    parameters                = {}
+    stored_as_sub_directories = false
+    columns {
+      name       = "type"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "time"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "elb"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "client_ip"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "client_port"
+      parameters = {}
+      type       = "int"
+    }
+    columns {
+      name       = "target_ip"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "target_port"
+      parameters = {}
+      type       = "int"
+    }
+    columns {
+      name       = "request_processing_time"
+      parameters = {}
+      type       = "double"
+    }
+    columns {
+      name       = "target_processing_time"
+      parameters = {}
+      type       = "double"
+    }
+    columns {
+      name       = "response_processing_time"
+      parameters = {}
+      type       = "double"
+    }
+    columns {
+      name       = "elb_status_code"
+      parameters = {}
+      type       = "int"
+    }
+    columns {
+      name       = "target_status_code"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "received_bytes"
+      parameters = {}
+      type       = "bigint"
+    }
+    columns {
+      name       = "sent_bytes"
+      parameters = {}
+      type       = "bigint"
+    }
+    columns {
+      name       = "request_verb"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "request_url"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "request_proto"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "user_agent"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "ssl_cipher"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "ssl_protocol"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "target_group_arn"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "trace_id"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "domain_name"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "chosen_cert_arn"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "matched_rule_priority"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "request_creation_time"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "actions_executed"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "redirect_url"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "lambda_error_reason"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "target_port_list"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "target_status_code_list"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "classification"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "classification_reason"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "conn_trace_id"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "unknown_fiedls"
+      parameters = {}
+      type       = "string"
+    }
+    ser_de_info {
+      name = null
+      parameters = {
+        "input.regex"          = "([^ ]*) ([^ ]*) ([^ ]*) ([^ ]*):([0-9]*) ([^ ]*)[:-]([0-9]*) ([-.0-9]*) ([-.0-9]*) ([-.0-9]*) (|[-0-9]*) (-|[-0-9]*) ([-0-9]*) ([-0-9]*) \"([^ ]*) (.*) (- |[^ ]*)\" \"([^\"]*)\" ([A-Z0-9-_]+) ([A-Za-z0-9.-]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^\"]*)\" ([-.0-9]*) ([^ ]*) \"([^\"]*)\" \"([^\"]*)\" \"([^ ]*)\" \"([^\\s]+?)\" \"([^\\s]+)\" \"([^ ]*)\" \"([^ ]*)\" ?([^ ]*)?( .*)?"
+        "serialization.format" = "1"
+      }
+      serialization_library = "org.apache.hadoop.hive.serde2.RegexSerDe"
+    }
+    skewed_info {
+      skewed_column_names               = []
+      skewed_column_value_location_maps = {}
+      skewed_column_values              = []
+    }
+  }
+}
+
+resource "aws_glue_catalog_table" "connection_log" {
+  name          = "alb_connection_logs"
+  database_name = aws_athena_database.log_search.name
+  owner         = "hadoop"
+  parameters = {
+    EXTERNAL                       = "TRUE"
+    "projection.day.format"        = "yyyy/MM/dd"
+    "projection.day.interval"      = "1"
+    "projection.day.interval.unit" = "DAYS"
+    "projection.day.range"         = "2022/01/01,NOW"
+    "projection.day.type"          = "date"
+    "projection.enabled"           = "true"
+    "storage.location.template"    = "s3://${aws_s3_bucket.alb_logs.bucket}/${local.connection_logs_prefix}/AWSLogs/${local.aws_account_id}/elasticloadbalancing/${local.aws_region}/$${day}"
+  }
+  retention  = 0
+  table_type = "EXTERNAL_TABLE"
+  partition_keys {
+    name = "day"
+    type = "string"
+  }
+  storage_descriptor {
+    additional_locations      = []
+    bucket_columns            = []
+    compressed                = false
+    input_format              = "org.apache.hadoop.mapred.TextInputFormat"
+    location                  = "s3://${aws_s3_bucket.alb_logs.bucket}/${local.connection_logs_prefix}/AWSLogs/${local.aws_account_id}/elasticloadbalancing/${local.aws_region}"
+    number_of_buckets         = -1
+    output_format             = "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat"
+    parameters                = {}
+    stored_as_sub_directories = false
+    columns {
+      name       = "time"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "client_ip"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "client_port"
+      parameters = {}
+      type       = "int"
+    }
+    columns {
+      name       = "listener_port"
+      parameters = {}
+      type       = "int"
+    }
+    columns {
+      name       = "tls_protocol"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "tls_cipher"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "tls_handshake_latency"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "leaf_client_cert_subect"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "leaf_client_cert_validity"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "leaf_client_cert_serial_number"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "tls_verify_status"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "conn_trace_id"
+      parameters = {}
+      type       = "string"
+    }
+    columns {
+      name       = "unknown_fiedls"
+      parameters = {}
+      type       = "string"
+    }
+    ser_de_info {
+      name = null
+      parameters = {
+        "input.regex"          = "([^ ]*) ([^ ]*) ([0-9]*) ([0-9]*) ([A-Za-z0-9.-]*) ([^ ]*) ([-.0-9]*) \"([^\"]*)\" ([^ ]*) ([^ ]*) ([^ ]*) ?([^ ]*)?( .*)?"
+        "serialization.format" = "1"
+      }
+      serialization_library = "org.apache.hadoop.hive.serde2.RegexSerDe"
+    }
+    skewed_info {
+      skewed_column_names               = []
+      skewed_column_value_location_maps = {}
+      skewed_column_values              = []
+    }
   }
 }
