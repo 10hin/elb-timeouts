@@ -19,6 +19,10 @@ public class MainServer {
     private static final Logger LOGGER = LoggerFactory.getLogger(MainServer.class.getName());
     private static final String CONNECTION_ID_MDC_KEY = "connID";
     private static final String REQUEST_ID_MDC_KEY = "reqID";
+    private static final int WAIT_SECONDS_BEFORE_RESPONSE;
+    static {
+        WAIT_SECONDS_BEFORE_RESPONSE = Integer.parseInt(System.getProperty("in.10h.java.elbtimeouts.server.waitsecondsbeforeresponse", "0"));
+    }
 
     public static void main(final String[] args) throws IOException {
         try (final var serverSocket = new ServerSocket()) {
@@ -116,6 +120,13 @@ public class MainServer {
 
         LOGGER.info(new RequestInfo(requestLineInfo, headers, requestBody).dump());
 
+        try {
+            LOGGER.info("start wait before response");
+            Thread.sleep(WAIT_SECONDS_BEFORE_RESPONSE * 1_000L);
+            LOGGER.info("end wait and start response");
+        } catch (InterruptedException e) {
+            throw new InternalError(e);
+        }
         writeResponse(connectionID, requestID, output, 200, "OK", "text/plain", "Hello, world!");
 
         if (headers.containsKey("connection") && headers.get("connection").size() == 1 && "close".equals(headers.get("connection").get(0))) {

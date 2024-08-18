@@ -10,6 +10,7 @@ import java.time.Duration;
 
 public class MainClient {
     public static void main(final String[] args) {
+        // System.setProperty("jdk.httpclient.keepalive.timeout", "30");
         final var clientBuilder = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .version(HttpClient.Version.HTTP_1_1)
